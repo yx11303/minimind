@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 const {
   Document, Packer, Paragraph, TextRun, ImageRun, Table, TableRow, TableCell, WidthType,
-  AlignmentType, BorderStyle, ShadingType, Footer, PageNumber, VerticalAlign,
+  AlignmentType, BorderStyle, ShadingType, Footer, PageNumber, VerticalAlign, HeadingLevel,
 } = require("docx");
 
 const [, , jsonPath, figDir, outPath] = process.argv;
@@ -16,6 +16,9 @@ const KAI = { ascii: "Times New Roman", hAnsi: "Times New Roman", eastAsia: "楷
 const pt = (n) => n * 2; // half-points
 
 const run = (text, o = {}) => new TextRun({ text, font: o.font || SONG, size: pt(o.size || 12), bold: !!o.bold, superScript: !!o.sup });
+// body run: inherits font/size from the paragraph style (edit the style once in Word to restyle the whole paper)
+const brun = (text, o = {}) => new TextRun({ text, bold: !!o.bold, superScript: !!o.sup });
+const styled = (style, children, extra = {}) => new Paragraph({ style, children, ...extra });
 const para = (children, o = {}) => new Paragraph({
   children, alignment: o.align || AlignmentType.JUSTIFIED,
   spacing: { line: o.line || 360, before: o.before || 0, after: o.after || 0 },
@@ -24,7 +27,7 @@ const para = (children, o = {}) => new Paragraph({
 
 const children = [];
 // ---- Chinese front matter ----
-children.push(para([run(M.title, { font: HEI, size: 18, bold: true })], { align: AlignmentType.CENTER, after: 240, line: 500 }));
+children.push(new Paragraph({ heading: HeadingLevel.TITLE, children: [run(M.title, { font: HEI, size: 18, bold: true })] }));
 children.push(para([run(M.author, { font: KAI, size: 12 })], { align: AlignmentType.CENTER, after: 60 }));
 children.push(para([run(`（${M.affil.replace(/^【|】$/g, "")}）`, { size: 10.5 })], { align: AlignmentType.CENTER, after: 240 }));
 const labeled = (label, text, font = SONG, labelFont = HEI) =>
@@ -68,7 +71,7 @@ const tableBlock = (b) => {
   });
   const all = [header, ...rows];
   return [
-    para([run(b.caption, { font: HEI, size: 10.5, bold: true })], { align: AlignmentType.CENTER, before: 120, after: 60, keepNext: true }),
+    styled("CaptionCN", [run(b.caption, { font: HEI, size: 10.5, bold: true })], { keepNext: true }),
     new Table({
       width: { size: total, type: WidthType.DXA }, columnWidths: widths, alignment: AlignmentType.CENTER,
       rows: all.map((r, ri) => new TableRow({ tableHeader: ri === 0, cantSplit: true,
@@ -79,9 +82,9 @@ const tableBlock = (b) => {
 };
 
 for (const b of data.blocks) {
-  if (b.type === "h1") children.push(para([run(b.text, { font: HEI, size: 14, bold: true })], { align: AlignmentType.LEFT, before: 240, after: 120, keepNext: true }));
-  else if (b.type === "h2") children.push(para([run(b.text, { font: HEI, size: 12, bold: true })], { align: AlignmentType.LEFT, before: 120, after: 60, keepNext: true }));
-  else if (b.type === "p") children.push(para(b.segs.map((s) => run(s.t, { sup: s.sup })), { indent: { firstLine: 480 } }));
+  if (b.type === "h1") children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [run(b.text, { font: HEI, size: 14, bold: true })] }));
+  else if (b.type === "h2") children.push(new Paragraph({ heading: HeadingLevel.HEADING_2, children: [run(b.text, { font: HEI, size: 12, bold: true })] }));
+  else if (b.type === "p") children.push(styled("BodyCN", b.segs.map((s) => brun(s.t, { sup: s.sup }))));
   else if (b.type === "table") children.push(...tableBlock(b));
   else if (b.type === "figure") {
     const img = fs.readFileSync(path.join(figDir, b.path));
@@ -90,24 +93,37 @@ for (const b of data.blocks) {
     children.push(new Paragraph({ alignment: AlignmentType.CENTER, spacing: { before: 120 }, keepNext: true,
       children: [new ImageRun({ type: "png", data: img, transformation: { width, height: Math.round(width * h / w) },
         altText: { title: b.caption, description: b.caption, name: b.path } })] }));
-    children.push(para([run(b.caption, { font: HEI, size: 10.5, bold: true })], { align: AlignmentType.CENTER, after: 120 }));
+    children.push(styled("CaptionCN", [run(b.caption, { font: HEI, size: 10.5, bold: true })]));
   }
 }
 
 // ---- References (GB/T 7714-2015, 顺序编码制) ----
-children.push(para([run("参考文献", { font: HEI, size: 14, bold: true })], { align: AlignmentType.LEFT, before: 240, after: 120 }));
+children.push(new Paragraph({ heading: HeadingLevel.HEADING_1, children: [run("参考文献", { font: HEI, size: 14, bold: true })] }));
 for (const r of data.refs) {
-  children.push(new Paragraph({
-    alignment: AlignmentType.LEFT, spacing: { line: 280, after: 40 },
-    indent: { left: 480, hanging: 480 },
-    children: [run(`[${r.n}]`, { size: 10.5 }), new TextRun({ text: "\t", size: pt(10.5) }), run(r.ref, { size: 10.5 })],
-    tabStops: [{ type: "left", position: 480 }],
-  }));
+  children.push(styled("RefCN", [brun(`[${r.n}]`), brun("\t"), brun(r.ref)], { tabStops: [{ type: "left", position: 480 }] }));
 }
 
 const doc = new Document({
   creator: "", title: M.title, description: M.etitle,
-  styles: { default: { document: { run: { font: SONG, size: pt(12) } } } },
+  styles: {
+    default: {
+      document: { run: { font: SONG, size: pt(12) } },
+      title: { run: { font: HEI, size: pt(18), bold: true, color: "000000" }, paragraph: { alignment: AlignmentType.CENTER, spacing: { line: 500, after: 240 } } },
+      heading1: { run: { font: HEI, size: pt(14), bold: true, color: "000000" }, paragraph: { spacing: { before: 240, after: 120, line: 360 }, keepNext: true } },
+      heading2: { run: { font: HEI, size: pt(12), bold: true, color: "000000" }, paragraph: { spacing: { before: 120, after: 60, line: 360 }, keepNext: true } },
+    },
+    paragraphStyles: [
+      { id: "BodyCN", name: "论文正文", basedOn: "Normal", next: "BodyCN", quickFormat: true,
+        run: { font: SONG, size: pt(12) },
+        paragraph: { alignment: AlignmentType.JUSTIFIED, spacing: { line: 360 }, indent: { firstLine: 480 } } },
+      { id: "CaptionCN", name: "论文图表题", basedOn: "Normal", next: "BodyCN", quickFormat: true,
+        run: { font: HEI, size: pt(10.5), bold: true },
+        paragraph: { alignment: AlignmentType.CENTER, spacing: { before: 120, after: 120 } } },
+      { id: "RefCN", name: "论文参考文献", basedOn: "Normal", next: "RefCN", quickFormat: true,
+        run: { font: SONG, size: pt(10.5) },
+        paragraph: { alignment: AlignmentType.LEFT, spacing: { line: 280, after: 40 }, indent: { left: 480, hanging: 480 } } },
+    ],
+  },
   sections: [{
     properties: { page: { size: { width: 11906, height: 16838 }, margin: { top: 1440, bottom: 1440, left: 1440, right: 1440 } } },
     footers: { default: new Footer({ children: [new Paragraph({ alignment: AlignmentType.CENTER,
