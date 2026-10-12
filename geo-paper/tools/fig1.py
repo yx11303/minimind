@@ -43,12 +43,16 @@ box(8.8, 2.0, 2.2, 0.62, "② 上下文分配", fs=10)
 box(8.8, 3.0, 2.2, 0.62, "③ 引用生成", fs=10)
 box(12.65, 4.6, 2.8, 0.95, "赞助区块\n（标注“赞助”）", ec=BLUE, fc="#e8f0f7")
 box(12.65, 2.75, 2.8, 1.2, "回答正文\n（含GEO内容，\n无广告标识）", ec=ORANGE, fc="#fbefe3")
+# proposed in-text insertion (mechanism-design research, not deployed): route above the engine box
+ax.plot([4.6, 4.6, 11.1], [4.25, 4.33, 4.33], color=BLUE, lw=1.1, ls=(0,(4,3)))
+ax.add_patch(FancyArrowPatch((11.1, 4.33), (11.5, 3.38), arrowstyle="-|>", mutation_scale=12, color=BLUE, lw=1.1, ls=(0,(4,3)), shrinkA=0, shrinkB=2))
+label(8.1, 4.5, "文内写入（机制设计研究方案，未上线）", color=BLUE, fs=8.8)
 
 # track 1
 arrow((1.75, 3.35), (2.75, 4.55), color=BLUE)
 label(1.85, 4.25, "广告费", color=BLUE)
 arrow((5.05, 4.75), (11.25, 4.75), color=BLUE, lw=1.6)
-label(8.15, 5.05, "轨道一：平台嵌入广告（收入归平台）", color=BLUE, fs=10, weight="bold")
+label(8.15, 5.05, "轨道一：平台广告（收入归平台）", color=BLUE, fs=10, weight="bold")
 
 # track 2
 arrow((1.75, 2.65), (2.9, 1.35), color=ORANGE)
@@ -61,15 +65,15 @@ arrow((9.9, 3.0), (11.25, 2.85), color=ORANGE, lw=1.6)
 label(10.75, -0.6, "轨道二：第三方GEO内容（收入归服务商与内容渠道）", color=ORANGE, fs=10, weight="bold")
 
 # manipulation
-box(3.3, -0.55, 5.4, 0.6, "对抗性操纵：虚构测评·伪造评价·策略性文本·知识投毒", ec=RED, fs=9.2, ls="--")
+box(3.3, -0.55, 5.4, 0.6, "操纵型GEO：虚构测评·伪造评价·策略性文本·提示注入", ec=RED, fs=9.2, ls="--")
 arrow((5.4, -0.25), (5.85, 0.48), color=RED, ls="--")
 
 # governance tags
 def tag(x, y, t):
     ax.text(x, y, t, ha="center", va="center", fontsize=8.6, color=GRAY,
             bbox=dict(boxstyle="round,pad=0.25", fc="white", ec=GRAY, lw=0.8))
-tag(6.15, 2.25, "治理点A：信源商业标记")
-tag(8.8, 0.02, "治理点B：信源可信度评估")
+tag(6.15, 2.25, "治理点A：随检索传递的商业标记")
+tag(8.8, 0.02, "治理点B：信源发布行为识别")
 tag(12.65, 6.15, "治理点C：多引擎重复抽样监测")
 
 fig.savefig(out, bbox_inches="tight", pad_inches=0.05, facecolor="white")

@@ -47,8 +47,13 @@ children.push(para([], { after: 200 }));
 const tableBlock = (b) => {
   const [header, ...rows] = b.rows;
   const total = 9000; // DXA, fits A4 text width (11906 - 2*1440 margin)
-  const first = 1500; const rest = Math.floor((total - first) / (header.length - 1));
-  const widths = [first, ...Array(header.length - 1).fill(rest)];
+  // column widths proportional to the longest cell text (sqrt-damped), min 1000 DXA
+  const len = (t) => [...t].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 2 : 1), 0);
+  const raw = header.map((_, ci) => Math.sqrt(Math.max(...b.rows.map((r) => len(r[ci] || "")))));
+  const sum = raw.reduce((a, x) => a + x, 0);
+  let widths = raw.map((x) => Math.max(1000, Math.round((total * x) / sum)));
+  const diff = total - widths.reduce((a, x) => a + x, 0);
+  widths[widths.indexOf(Math.max(...widths))] += diff;
   const thick = { style: BorderStyle.SINGLE, size: 12, color: "000000" };
   const thin = { style: BorderStyle.SINGLE, size: 6, color: "000000" };
   const none = { style: BorderStyle.NONE, size: 0, color: "FFFFFF" };
@@ -58,8 +63,8 @@ const tableBlock = (b) => {
     margins: { top: 60, bottom: 60, left: 80, right: 80 },
     shading: { type: ShadingType.CLEAR, fill: "FFFFFF", color: "auto" },
     borders: { top: r === 0 ? thick : none, bottom: isHead ? thin : (isLast ? thick : none), left: none, right: none },
-    children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { line: 260 },
-      children: [run(t, { size: 10.5, font: isHead ? HEI : SONG, bold: isHead })] })],
+    children: [new Paragraph({ alignment: AlignmentType.CENTER, spacing: { line: 240 },
+      children: [run(t, { size: 9, font: isHead ? HEI : SONG, bold: isHead })] })],
   });
   const all = [header, ...rows];
   return [
